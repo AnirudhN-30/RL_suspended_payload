@@ -109,7 +109,7 @@ def _add_payload_tendon(spec: mujoco.MjSpec) -> None:
 
 
 def flare_payload_env_cfg(
-  play: bool = False, reward_profile: RewardProfile = "acp_smooth"
+  play: bool = False, reward_profile: RewardProfile = "flare"
 ) -> ManagerBasedRlEnvCfg:
   reward_weights = _REWARD_WEIGHTS[reward_profile]
   actor_terms = {
@@ -205,7 +205,7 @@ def flare_payload_env_cfg(
 
 
 def flare_payload_ppo_runner_cfg(
-  profile: PpoProfile = "acp_smooth",
+  profile: PpoProfile = "flare",
 ) -> RslRlOnPolicyRunnerCfg:
   return RslRlOnPolicyRunnerCfg(
     actor=RslRlModelCfg(
@@ -238,11 +238,11 @@ def flare_payload_ppo_runner_cfg(
       max_grad_norm=1.0,
     ),
     experiment_name={
-      "flare": "flare_payload_baseline",
+      "flare": "flare_payload_drone_relative_l2_v1",
       "acp_tuned": "flare_payload_acp_tuned",
       "acp_smooth": "flare_payload_acp_smooth_v2",
     }[profile],
     save_interval=100,
     num_steps_per_env=100,
-    max_iterations=800,
+    max_iterations=1000,
   )

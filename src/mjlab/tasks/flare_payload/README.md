@@ -33,12 +33,27 @@ controller and exact motor mixer turn these into the four rotor thrusts. The
 policy does not output a wrench and there is no position PID between the policy
 and vehicle.
 
-The task keeps the six released FLARE Scenario I reward functions. The default
-smooth-v2 profile uses target progress `5`, action smoothness `-0.01`, yaw
-`0.01`, angular rate `-0.005`, crash `-20`, and cable safety `1.0`. Rewards are
-scaled by the 0.01 s policy period. The completed first tuning profile remains
-available through `Mjlab-Flare-Waypoint-Payload-ACP-Tuned-V1`, and the original
-FLARE coefficients through `Mjlab-Flare-Waypoint-Payload-Flare-Rewards`.
+## Drone-relative waypoint / L2 retraining (v1)
+
+Following paper Section II-C, both initial targets are independently sampled
+with XYZ offsets in `[-2, 2] × [-2, 2] × [0.5, 1.5] m` from the drone.
+On arrival, waypoint 2 becomes waypoint 1 and a new waypoint 2 is sampled
+relative to the drone's current position, not relative to waypoint 1.
+Targets remain fixed in world space until promoted/replaced; they do not move
+continuously with the drone. Both observation vectors remain drone-relative.
+The arrival radius remains 0.5 m. Fixed evaluation tracks are unchanged.
+
+The Z range is interpreted literally as a positive offset from the drone,
+not an absolute altitude band. The paper's wording is used for this run;
+this allows target altitude to increase across successful transitions.
+Other simulator and reward differences mean this is not a full paper reproduction.
+
+Smoothness now uses the **unsquared** L2 norm from paper Eq. (8):
+`-1e-4 * ||action_t - action_(t-1)||_2` before MJLab's existing 0.01 s
+reward scaling. The default uses the existing FLARE reward/PPO profile, not
+the older smooth-v2 tuning. Other reward terms, the plant, observation layout,
+and controller remain unchanged. Named ACP profiles retain their coefficients
+but also use the corrected norm and new waypoint sampler.
 
 ## Setup and checks
 
@@ -61,16 +76,16 @@ tendon length, loaded hover motor thrust, and CUDA execution.
 ```bash
 cd /home/anirudh/.openclaw/workspace/RL_suspended_payload
 uv run --extra cu128 train Mjlab-Flare-Waypoint-Payload \
-  --env.scene.num-envs 4096 \
-  --agent.logger tensorboard
+  --env.scene.num-envs 1024 \
+  --agent.logger tensorboard --agent.resume False --agent.max-iterations 1000
 ```
 
 Training uses RSL-RL PPO with a `26 -> 128 -> 128 -> 4` tanh actor and a matching
-critic. The smooth-v2 profile uses learning rate `1e-4` and entropy coefficient
-`0.0005`; the remaining PPO settings match the FLARE baseline. Checkpoints and
-TensorBoard logs are written below `logs/rsl_rl/flare_payload_acp_smooth_v2/`. This
-first version intentionally has no plant or sensor randomization; add that only
-after the nominal policy learns reliably.
+critic, learning rate `3e-4`, entropy coefficient `0.002`, and 100 rollout steps.
+The command above starts from scratch: 1,024 environments × 100 steps × 1,000
+iterations = 102.4 million samples. Outputs are isolated under
+`logs/rsl_rl/flare_payload_drone_relative_l2_v1/`. No old checkpoint is resumed.
+Nominal plant/sensor settings are retained; no new domain randomization is added.
 
 ## Visualize
 

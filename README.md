@@ -17,7 +17,7 @@ the Python package remains `mjlab` for compatibility.
 cd RL_suspended_payload
 uv sync --python /usr/bin/python3.10 --extra cu128
 uv run --extra cu128 python scripts/verify_flare_payload.py
-uv run --extra cu128 train Mjlab-Flare-Waypoint-Payload --env.scene.num-envs 4096 --agent.logger tensorboard
+uv run --extra cu128 train Mjlab-Flare-Waypoint-Payload --env.scene.num-envs 1024 --agent.logger tensorboard --agent.resume False --agent.max-iterations 1000
 ```
 
 ## Visualization
@@ -31,8 +31,8 @@ The existing policy uses a 0.5 m arrival radius. Repository migration does not
 change training, controller, or waypoint behavior.
 
 Checkpoints, logs, evaluation results, and virtual environments are excluded
-from Git. On the original workstation, ignored symlinks expose existing
-`mjlab/logs` and `mjlab/eval/results` without duplicating artifacts. Fresh clones
+from Git. On the original workstation, ignored links expose old experiment directories and `mjlab/eval/results`
+without duplicating artifacts. New training runs are stored in this repository. Fresh clones
 must install dependencies and supply a checkpoint with `--checkpoint`.
 
 ## Documentation and attribution
@@ -42,3 +42,6 @@ must install dependencies and supply a checkpoint with `--checkpoint`.
 - [Original MJLab README](README.mjlab.md)
 - [Upstream source](https://github.com/lfrecalde1/mjlab)
 - [License](LICENSE)
+
+The default training task now uses drone-relative XYZ waypoint sampling and the
+unsquared L2 smoothness reward. See the task documentation for paper distinctions.
