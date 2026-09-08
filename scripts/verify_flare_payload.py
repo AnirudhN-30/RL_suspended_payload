@@ -43,7 +43,7 @@ def main() -> None:
   assert torch.allclose(
     mdp.action_smoothness(env), torch.full((16,), 0.5, device=env.device)
   )
-  assert cfg.rewards["smooth"].weight == -0.0001
+  assert cfg.rewards["smooth"].weight == -0.01
   observations, _ = env.reset(seed=7)
   for target in (command.current, command.next):
     delta = target - env.scene["quadrotor"].data.root_link_pos_w

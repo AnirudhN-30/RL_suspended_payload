@@ -109,7 +109,7 @@ def _add_payload_tendon(spec: mujoco.MjSpec) -> None:
 
 
 def flare_payload_env_cfg(
-  play: bool = False, reward_profile: RewardProfile = "flare"
+  play: bool = False, reward_profile: RewardProfile = "acp_smooth"
 ) -> ManagerBasedRlEnvCfg:
   reward_weights = _REWARD_WEIGHTS[reward_profile]
   actor_terms = {

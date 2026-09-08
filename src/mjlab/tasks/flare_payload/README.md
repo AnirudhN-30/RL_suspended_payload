@@ -48,12 +48,16 @@ not an absolute altitude band. The paper's wording is used for this run;
 this allows target altitude to increase across successful transitions.
 Other simulator and reward differences mean this is not a full paper reproduction.
 
-Smoothness now uses the **unsquared** L2 norm from paper Eq. (8):
-`-1e-4 * ||action_t - action_(t-1)||_2` before MJLab's existing 0.01 s
-reward scaling. The default uses the existing FLARE reward/PPO profile, not
-the older smooth-v2 tuning. Other reward terms, the plant, observation layout,
-and controller remain unchanged. Named ACP profiles retain their coefficients
-but also use the corrected norm and new waypoint sampler.
+Smoothness uses the **unsquared** L2 norm from paper Eq. (8), with the
+quad-tuned `acp_smooth` coefficient: `-0.01 * ||action_t - action_(t-1)||_2`
+before MJLab's existing 0.01 s reward scaling. Default reward weights are:
+target `5`, smoothness `-0.01`, yaw `0.01`, angular rate `-0.005`, crash `-20`,
+and cable safety `1.0`. These are tuned coefficients, not the paper coefficients.
+The explicit `Mjlab-Flare-Waypoint-Payload-Flare-Rewards` task still uses the
+`flare` coefficients. PPO settings remain unchanged (learning rate `3e-4`,
+entropy coefficient `0.002`); restoring reward weights does not switch PPO profiles.
+The plant, observation layout, controller, drone-relative sampling, and actor
+output tanh remain unchanged.
 
 ## Setup and checks
 
