@@ -14,7 +14,15 @@ artifacts/
 render_robots.py
 benchmark_results/
 
+# FLARE training/evaluation artifacts (keep source and scripts only).
+eval/results/
+*.pt
+src/mjlab/tasks/flare_payload/FLARE.pdf
+
 # Documentation outputs.
 **/_build/*
 **/generated/*
 
+# Local artifact links (also ignore symlinks).
+/logs
+/eval/results

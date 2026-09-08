@@ -29,16 +29,17 @@ classifiers = [
   "Natural Language :: English",
 ]
 description = "Isaac Lab API, powered by MuJoCo-Warp, for RL and robotics research."
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10,<3.11"
 dependencies = [
   "prettytable",
   "tqdm",
   "tyro>=1.0.1",
   "torch>=2.7.0",
+  "scipy",
   "torchrunx>=0.3.4",
-  "warp-lang>=1.12.0",
+  "warp-lang==1.12.0",
   "mujoco-warp>=3.6.0",
-  "mujoco>=3.6.0",
+  "mujoco==3.6.0",
   "trimesh>=4.8.3",
   "viser>=1.0.24",
   "mediapy>=1.2.6",
@@ -96,16 +97,8 @@ cpu = ["torch>=2.7.0"]
 conflicts = [
   [{extra = "cu128"}, {extra = "cpu"}],
 ]
-# The nightly index (py.mujoco.org) only has dev builds, and PEP 440 ranks
-# 3.6.0.devN < 3.6.0, so the >=3.6.0 floor in [project.dependencies] would
-# reject them. This override loosens the constraint for uv resolution only.
-override-dependencies = ["mujoco>=3.6.0.dev0"]
-required-environments = [
-  "sys_platform == 'darwin' and platform_machine == 'arm64'",
-  "sys_platform == 'linux' and platform_machine == 'x86_64'",
-]
-
 [[tool.uv.index]]
+name = "pypi"
 url = "https://pypi.org/simple"
 
 [[tool.uv.index]]
@@ -123,19 +116,13 @@ name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
-[[tool.uv.index]]
-name = "mujoco"
-url = "https://py.mujoco.org"
-explicit = true
-
 [tool.uv.sources]
+mujoco = { index = "pypi" }
 warp-lang = { index = "nvidia", marker = "sys_platform != 'darwin'" }
 torch = [
   { index = "pytorch-cu128", extra = "cu128", marker = "sys_platform != 'darwin'" },
   { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform != 'darwin'" },
 ]
-mujoco = { index = "mujoco" }
-mujoco-warp = { git = "https://github.com/google-deepmind/mujoco_warp", rev = "d9bcc326544b845111eed21079bfa8f8738e2518" }
 
 [tool.ruff]
 src = ["src"]  # Helpful for recognizing first-party imports.

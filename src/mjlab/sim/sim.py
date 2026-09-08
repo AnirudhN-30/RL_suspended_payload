@@ -404,7 +404,13 @@ class Simulation:
     if not self.wp_device.is_cuda:
       return False
 
-    driver_ver = wp.context.runtime.driver_version
+    # Warp 1.17 made the public helper the supported API and no longer exposes
+    # ``wp.context`` at module level. Retain compatibility with older Warp
+    # versions used by earlier mjlab lockfiles.
+    if hasattr(wp, "get_cuda_driver_version"):
+      driver_ver = wp.get_cuda_driver_version()
+    else:
+      driver_ver = wp.context.runtime.driver_version
     has_mempool = wp.is_mempool_enabled(self.wp_device)
 
     if driver_ver is None:
