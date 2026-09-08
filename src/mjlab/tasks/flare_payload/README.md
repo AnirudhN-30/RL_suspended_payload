@@ -84,7 +84,7 @@ Training uses RSL-RL PPO with a `26 -> 128 -> 128 -> 4` tanh actor and a matchin
 critic, learning rate `3e-4`, entropy coefficient `0.002`, and 100 rollout steps.
 The command above starts from scratch: 1,024 environments × 100 steps × 1,000
 iterations = 102.4 million samples. Outputs are isolated under
-`logs/rsl_rl/flare_payload_drone_relative_l2_v1/`. No old checkpoint is resumed.
+`logs/rsl_rl/flare_payload_drone_relative_l2_tanh_v2/`. No old checkpoint is resumed.
 Nominal plant/sensor settings are retained; no new domain randomization is added.
 
 ## Visualize
@@ -96,3 +96,34 @@ uv run --extra cu128 play Mjlab-Flare-Waypoint-Payload --agent random
 For a calm plant visualization and low-level-controller tests, use the viewer in
 the sibling native reference repository instead; random policy actions are
 aggressive by design.
+
+## Actor output tanh and actuator mapping
+
+The actor is `26 -> Linear(128) -> tanh -> Linear(128) -> tanh -> Linear(4)
+-> tanh`. The critic retains a linear scalar output. The actor class is
+`mjlab.tasks.flare_payload.policy:FlareTanhActor`.
+
+Deterministic inference uses the bounded mean. Training samples a Gaussian
+around that mean, with ordinary Gaussian PPO log probabilities (not a
+squashed Gaussian). Samples can exceed [-1, 1]; the existing controller clips
+commands before physical scaling. The smoothness reward still uses the
+existing action-manager actions, not newly substituted motor commands.
+
+For clipped normalized actions u:
+
+- Total thrust: `(u[0] + 1) / 2 * 3.5 * 1.1628 * 9.81` N, or 0–39.924738 N.
+- Roll rate: `15 * u[1]` rad/s.
+- Pitch rate: `15 * u[2]` rad/s.
+- Yaw rate: `5 * u[3]` rad/s.
+
+The body-rate PID generates torques, and the existing inverse effectiveness
+matrix maps total thrust plus torques to four rotor thrusts. Each rotor is
+clamped to [0, 20.5] N. Commands are held over five 0.002 s physics steps.
+Level, zero-rate loaded hover requires approximately u[0] = -0.42857,
+not zero (zero requests half maximum collective thrust).
+
+Start fresh for this architecture. An actor checkpoint marker prevents strict
+loading of older linear-output checkpoints, including in the evaluator/player.
+Their old default checkpoint paths are not tanh policies; supply a new v2
+checkpoint with `--checkpoint` after training. Old policies remain usable with
+the previous code revision. No training is automatically started by this change.

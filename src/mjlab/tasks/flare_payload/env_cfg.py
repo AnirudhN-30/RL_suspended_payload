@@ -209,6 +209,7 @@ def flare_payload_ppo_runner_cfg(
 ) -> RslRlOnPolicyRunnerCfg:
   return RslRlOnPolicyRunnerCfg(
     actor=RslRlModelCfg(
+      class_name="mjlab.tasks.flare_payload.policy:FlareTanhActor",
       hidden_dims=(128, 128),
       activation="tanh",
       obs_normalization=False,
@@ -238,7 +239,7 @@ def flare_payload_ppo_runner_cfg(
       max_grad_norm=1.0,
     ),
     experiment_name={
-      "flare": "flare_payload_drone_relative_l2_v1",
+      "flare": "flare_payload_drone_relative_l2_tanh_v2",
       "acp_tuned": "flare_payload_acp_tuned",
       "acp_smooth": "flare_payload_acp_smooth_v2",
     }[profile],
