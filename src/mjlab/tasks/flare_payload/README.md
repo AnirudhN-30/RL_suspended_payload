@@ -113,6 +113,23 @@ uv run --extra cu128 python eval/play_flare_trajectory.py \
 For this task, evaluation distance and waypoint counts are measured from the
 payload rather than the quadrotor.
 
+### Interactive hover disturbance test
+
+Hold the payload target fixed at its reset position and physically disturb the
+quadrotor or payload with the native MuJoCo viewer:
+
+```bash
+uv run --extra cu128 python eval/play_flare_hover.py \
+  --checkpoint logs/rsl_rl/flare_payload_targeting_26d/<run>/model_<iteration>.pt
+```
+
+If `--checkpoint` is omitted, the script selects the most recently written
+payload-targeting checkpoint. Double-click a body to select it, then use
+`Ctrl + left-drag` for a translational force or `Ctrl + right-drag` for a
+rotational torque. Releasing the mouse removes the disturbance so recovery can
+be observed. The terminal reports payload error and cable angle once per
+simulated second.
+
 ## Visualize
 
 ```bash
