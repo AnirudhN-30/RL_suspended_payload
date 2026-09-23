@@ -22,6 +22,7 @@ from mjlab.tasks.registry import load_env_cfg, load_rl_cfg, load_runner_cls
 from mjlab.utils.torch import configure_torch_backends
 
 TASK_ID = "Mjlab-Flare-Waypoint-Payload"
+PAYLOAD_TARGET_TASK_ID = "Mjlab-Flare-Payload-Targeting"
 DEFAULT_CHECKPOINT = Path("logs/rsl_rl/flare_payload/2026-09-04_15-00-03/model_799.pt")
 
 
@@ -80,7 +81,9 @@ def _to_numpy(value: torch.Tensor) -> np.ndarray:
   return value.detach().cpu().numpy()
 
 
-def _write_plot(rows: list[dict[str, float | int | bool]], output: Path) -> None:
+def _write_plot(
+  rows: list[dict[str, float | int | bool]], output: Path, arrival_threshold: float
+) -> None:
   try:
     import matplotlib.pyplot as plt
   except ImportError:
@@ -110,7 +113,12 @@ def _write_plot(rows: list[dict[str, float | int | bool]], output: Path) -> None
 
   ax = fig.add_subplot(2, 2, 2)
   ax.plot(t, [row["distance_m"] for row in selected])
-  ax.axhline(0.5, color="tab:green", linestyle="--", label="arrival threshold")
+  ax.axhline(
+    arrival_threshold,
+    color="tab:green",
+    linestyle="--",
+    label="arrival threshold",
+  )
   ax.set(xlabel="time [s]", ylabel="distance [m]", title="Waypoint distance")
   ax.legend()
 
@@ -144,15 +152,15 @@ def evaluate(args: argparse.Namespace) -> Path:
       "eval/evaluate_flare.py ...`."
     )
 
-  env_cfg = load_env_cfg(TASK_ID)
-  agent_cfg = load_rl_cfg(TASK_ID)
+  env_cfg = load_env_cfg(args.task_id)
+  agent_cfg = load_rl_cfg(args.task_id)
   env_cfg.scene.num_envs = args.num_envs
   env_cfg.seed = args.seed
   env_cfg.episode_length_s = args.episode_length_s
 
   raw_env = ManagerBasedRlEnv(cfg=env_cfg, device=args.device)
   env = RslRlVecEnvWrapper(raw_env, clip_actions=agent_cfg.clip_actions)
-  runner_cls = load_runner_cls(TASK_ID) or MjlabOnPolicyRunner
+  runner_cls = load_runner_cls(args.task_id) or MjlabOnPolicyRunner
   runner = runner_cls(env, asdict(agent_cfg), device=args.device)
   runner.load(
     str(checkpoint), load_cfg={"actor": True}, strict=True, map_location=args.device
@@ -160,6 +168,7 @@ def evaluate(args: argparse.Namespace) -> Path:
   policy = runner.get_inference_policy(device=args.device)
 
   waypoint_term = raw_env.command_manager.get_term("waypoints")
+  tracked_entity = waypoint_term.cfg.entity_name
   trajectory_points = _configure_fixed_trajectory(waypoint_term, raw_env, args)
 
   # Reset after runner construction so the recorded episodes all begin at the
@@ -186,7 +195,8 @@ def evaluate(args: argparse.Namespace) -> Path:
       action = policy(obs).clamp(-1.0, 1.0)
       quad = raw_env.scene["quadrotor"].data
       payload = raw_env.scene["payload"].data
-      distance = torch.linalg.norm(waypoint_term.current - quad.root_link_pos_w, dim=1)
+      tracked_position = raw_env.scene[tracked_entity].data.root_link_pos_w
+      distance = torch.linalg.norm(waypoint_term.current - tracked_position, dim=1)
       cable_deg = torch.rad2deg(mdp.cable_body_angle(raw_env))
       tendon = raw_env.sim.data.ten_length[:, 0]
       waypoint_changed = torch.any(
@@ -277,6 +287,9 @@ def evaluate(args: argparse.Namespace) -> Path:
 
   reached = np.asarray([ep["waypoints_reached"] for ep in episode_rows])
   summary = {
+    "task_id": args.task_id,
+    "tracked_entity": tracked_entity,
+    "arrival_threshold_m": waypoint_term.cfg.arrival_threshold,
     "checkpoint": str(checkpoint),
     "seed": args.seed,
     "num_episodes": args.num_envs,
@@ -299,7 +312,11 @@ def evaluate(args: argparse.Namespace) -> Path:
     "episodes": episode_rows,
   }
   (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
-  _write_plot(rows, output / "trajectory_env_000.png")
+  _write_plot(
+    rows,
+    output / "trajectory_env_000.png",
+    arrival_threshold=waypoint_term.cfg.arrival_threshold,
+  )
   env.close()
   print(
     json.dumps(
@@ -312,6 +329,11 @@ def evaluate(args: argparse.Namespace) -> Path:
 
 def main() -> None:
   parser = argparse.ArgumentParser(description=__doc__)
+  parser.add_argument(
+    "--task-id",
+    choices=(TASK_ID, PAYLOAD_TARGET_TASK_ID),
+    default=TASK_ID,
+  )
   parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
   parser.add_argument("--num-envs", type=int, default=64)
   parser.add_argument("--seed", type=int, default=42)

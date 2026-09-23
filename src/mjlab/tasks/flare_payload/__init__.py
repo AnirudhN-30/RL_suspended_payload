@@ -1,12 +1,24 @@
 from mjlab.tasks.registry import register_mjlab_task
 
-from .env_cfg import flare_payload_env_cfg, flare_payload_ppo_runner_cfg
+from .env_cfg import (
+  flare_payload_env_cfg,
+  flare_payload_ppo_runner_cfg,
+  flare_payload_targeting_env_cfg,
+  flare_payload_targeting_ppo_runner_cfg,
+)
 
 register_mjlab_task(
   task_id="Mjlab-Flare-Waypoint-Payload",
   env_cfg=flare_payload_env_cfg(),
   play_env_cfg=flare_payload_env_cfg(play=True),
   rl_cfg=flare_payload_ppo_runner_cfg(),
+)
+
+register_mjlab_task(
+  task_id="Mjlab-Flare-Payload-Targeting",
+  env_cfg=flare_payload_targeting_env_cfg(),
+  play_env_cfg=flare_payload_targeting_env_cfg(play=True),
+  rl_cfg=flare_payload_targeting_ppo_runner_cfg(),
 )
 
 register_mjlab_task(

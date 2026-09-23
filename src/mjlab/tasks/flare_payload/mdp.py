@@ -136,6 +136,8 @@ class FlareRotorRateAction(BaseAction):
 @dataclass(kw_only=True)
 class FlareWaypointCommandCfg(CommandTermCfg):
   entity_name: str = "quadrotor"
+  sampling_entity_name: str | None = None
+  sample_relative_to_entity: bool = False
   x_range: tuple[float, float] = (-1.5, 1.5)
   y_range: tuple[float, float] = (-1.5, 1.5)
   z_range: tuple[float, float] = (0.5, 1.5)
@@ -151,6 +153,11 @@ class FlareWaypointCommand(CommandTerm):
   def __init__(self, cfg: FlareWaypointCommandCfg, env):
     super().__init__(cfg, env)
     self.asset = env.scene[cfg.entity_name]
+    self.sampling_asset = (
+      env.scene[cfg.sampling_entity_name]
+      if cfg.sampling_entity_name is not None
+      else self.asset
+    )
     self.current = torch.zeros(self.num_envs, 3, device=self.device)
     self.next = torch.zeros_like(self.current)
     # Snapshots reproduce FLARE's reached-waypoint transition observation.
@@ -168,6 +175,14 @@ class FlareWaypointCommand(CommandTerm):
     values[:, 0].uniform_(*self.cfg.x_range)
     values[:, 1].uniform_(*self.cfg.y_range)
     values[:, 2].uniform_(*self.cfg.z_range)
+    if self.cfg.sample_relative_to_entity:
+      # Read the free-joint qpos directly. During reset, MuJoCo's derived xpos
+      # cache has not been forwarded yet, while qpos already contains the new
+      # per-environment world position.
+      entity_data = self.sampling_asset.data
+      free_pos_ids = entity_data.indexing.free_joint_q_adr[:3]
+      anchor = entity_data.data.qpos[env_ids][:, free_pos_ids]
+      return values + anchor
     return values + self._env.scene.env_origins[env_ids]
 
   def _resample_command(self, env_ids: torch.Tensor) -> None:
@@ -304,9 +319,37 @@ class TargetProgressReward(ManagerTermBase):
     self.previous_position[env_ids] = _quad(self._env).data.root_link_pos_w[env_ids]
 
 
+class PayloadTargetProgressReward(ManagerTermBase):
+  """FLARE Scenario-II progress of the payload toward the active target."""
+
+  def __init__(self, cfg, env):
+    del cfg
+    super().__init__(env)
+    self.previous_position = torch.zeros(self.num_envs, 3, device=self.device)
+
+  def __call__(self, env) -> torch.Tensor:
+    position = _payload(env).data.root_link_pos_w
+    command = _waypoints(env).current
+    before = command - self.previous_position
+    after = command - position
+    reward = torch.sum(before.square() - after.square(), dim=1)
+    self.previous_position[:] = position
+    return reward
+
+  def reset(self, env_ids) -> None:
+    self.previous_position[env_ids] = _payload(self._env).data.root_link_pos_w[env_ids]
+
+
 def action_smoothness(env) -> torch.Tensor:
   return torch.sum(
     (env.action_manager.action - env.action_manager.prev_action).square(), dim=1
+  )
+
+
+def action_smoothness_l2(env) -> torch.Tensor:
+  """Paper Eq. (8): Euclidean norm of consecutive action changes."""
+  return torch.linalg.vector_norm(
+    env.action_manager.action - env.action_manager.prev_action, dim=1
   )
 
 
@@ -352,6 +395,47 @@ class FlareCrashTermination(ManagerTermBase):
       | (asset.data.root_link_pos_w[:, 2] < 0.1)
       | (self.safety_count > 150)
       | (angle > 1.571)
+    )
+
+  def reset(self, env_ids) -> None:
+    self.safety_count[env_ids] = 0
+
+
+class FlarePayloadTargetCrashTermination(ManagerTermBase):
+  """Terminate when either vehicle or payload leaves the target workspace."""
+
+  def __init__(self, cfg, env):
+    del cfg
+    super().__init__(env)
+    self.safety_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+
+  def __call__(self, env) -> torch.Tensor:
+    quad = _quad(env)
+    payload = _payload(env)
+    target = _waypoints(env).current
+    quad_rel = target - quad.data.root_link_pos_w
+    payload_rel = target - payload.data.root_link_pos_w
+    roll, pitch, _ = euler_xyz_from_quat(quad.data.root_link_quat_w)
+    angle = cable_body_angle(env)
+    self.safety_count += (
+      angle > torch.deg2rad(torch.tensor(75.0, device=env.device))
+    ).long()
+    return (
+      (torch.abs(torch.rad2deg(roll)) > 180.0)
+      | (torch.abs(torch.rad2deg(pitch)) > 180.0)
+      | (torch.abs(quad_rel[:, 0]) > 3.0)
+      | (torch.abs(quad_rel[:, 1]) > 3.0)
+      | (torch.abs(quad_rel[:, 2]) > 2.0)
+      | (torch.abs(payload_rel[:, 0]) > 3.0)
+      | (torch.abs(payload_rel[:, 1]) > 3.0)
+      # The payload begins 0.71 m below the quadrotor, so its valid vertical
+      # target error must include the cable length in addition to the 2 m
+      # quadrotor bound.
+      | (torch.abs(payload_rel[:, 2]) > 2.7)
+      | (quad.data.root_link_pos_w[:, 2] < 0.1)
+      | (payload.data.root_link_pos_w[:, 2] < 0.05)
+      | (self.safety_count > 150)
+      | (angle > torch.pi / 2.0)
     )
 
   def reset(self, env_ids) -> None:

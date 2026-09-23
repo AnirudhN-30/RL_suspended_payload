@@ -216,6 +216,40 @@ def flare_payload_env_cfg(
   return cfg
 
 
+def flare_payload_targeting_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+  """FLARE payload-waypoint navigation while retaining the released 26D interface."""
+  cfg = flare_payload_env_cfg(play=play, reward_profile="acp_smooth")
+
+  cfg.commands["waypoints"] = mdp.FlareWaypointCommandCfg(
+    entity_name="payload",
+    sampling_entity_name="quadrotor",
+    sample_relative_to_entity=True,
+    x_range=(-2.0, 2.0),
+    y_range=(-2.0, 2.0),
+    z_range=(0.5, 1.5),
+    arrival_threshold=0.2,
+    resampling_time_range=(1.0e9, 1.0e9),
+    debug_vis=True,
+  )
+  cfg.rewards["target"] = RewardTermCfg(
+    func=mdp.PayloadTargetProgressReward,
+    weight=_REWARD_WEIGHTS["acp_smooth"]["target"],
+  )
+  cfg.rewards["smooth"] = RewardTermCfg(
+    func=mdp.action_smoothness_l2,
+    weight=_REWARD_WEIGHTS["acp_smooth"]["smooth"],
+  )
+  # Keep the existing ACP-smooth body-rate penalty as requested.
+  cfg.rewards["angular"] = RewardTermCfg(
+    func=mdp.angular_rate_norm,
+    weight=_REWARD_WEIGHTS["acp_smooth"]["angular"],
+  )
+  cfg.terminations["crash"] = TerminationTermCfg(
+    func=mdp.FlarePayloadTargetCrashTermination
+  )
+  return cfg
+
+
 def flare_payload_ppo_runner_cfg(
   profile: PpoProfile = "acp_smooth",
 ) -> RslRlOnPolicyRunnerCfg:
@@ -258,3 +292,11 @@ def flare_payload_ppo_runner_cfg(
     num_steps_per_env=100,
     max_iterations=800,
   )
+
+
+def flare_payload_targeting_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+  cfg = flare_payload_ppo_runner_cfg(profile="acp_smooth")
+  cfg.actor.class_name = "mjlab.tasks.flare_payload.policy:FlareTanhActor"
+  cfg.experiment_name = "flare_payload_targeting_26d"
+  cfg.max_iterations = 1000
+  return cfg

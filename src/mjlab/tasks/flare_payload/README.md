@@ -40,6 +40,17 @@ scaled by the 0.01 s policy period. The completed first tuning profile remains
 available through `Mjlab-Flare-Waypoint-Payload-ACP-Tuned-V1`, and the original
 FLARE coefficients through `Mjlab-Flare-Waypoint-Payload-Flare-Rewards`.
 
+## Payload waypoint navigation
+
+`Mjlab-Flare-Payload-Targeting` is the payload-navigation variant. It deliberately
+retains the existing 26-value observation, four CTBR actions, rate PID, motor
+mixer, and ACP-smooth body-rate penalty. The active waypoint is considered
+reached when the **payload** enters a 0.2 m sphere, and target progress is
+computed from the payload position. Current and next targets are sampled from
+the paper's `[-2, 2] x [-2, 2] x [0.5, 1.5] m` volume relative to the quadrotor.
+Action smoothness uses the paper's L2 norm of consecutive action differences.
+The separate task keeps existing Scenario-I checkpoints compatible.
+
 ## Setup and checks
 
 The repository is pinned to Python 3.10, MuJoCo 3.6, Warp 1.12, and the CUDA
@@ -50,6 +61,7 @@ no longer exists.
 cd /home/anirudh/.openclaw/workspace/mjlab
 uv sync --python /usr/bin/python3.10 --extra cu128
 uv run --extra cu128 python scripts/verify_flare_payload.py
+uv run --extra cu128 python scripts/verify_flare_payload_targeting.py
 uv run --extra cu128 python scripts/benchmark_flare_payload.py --num-envs 4096
 ```
 
@@ -71,6 +83,35 @@ critic. The smooth-v2 profile uses learning rate `1e-4` and entropy coefficient
 TensorBoard logs are written below `logs/rsl_rl/flare_payload_acp_smooth_v2/`. This
 first version intentionally has no plant or sensor randomization; add that only
 after the nominal policy learns reliably.
+
+Train payload waypoint navigation from scratch with:
+
+```bash
+uv run --extra cu128 train Mjlab-Flare-Payload-Targeting \
+  --env.scene.num-envs 4096 \
+  --agent.logger tensorboard
+```
+
+Its checkpoints are written below
+`logs/rsl_rl/flare_payload_targeting_26d/`. The actor uses a final tanh
+projection, while Gaussian exploration and the downstream action clipping stay
+unchanged.
+
+Evaluate or visualize a trained payload-targeting checkpoint with:
+
+```bash
+uv run --extra cu128 python eval/evaluate_flare.py \
+  --task-id Mjlab-Flare-Payload-Targeting \
+  --checkpoint logs/rsl_rl/flare_payload_targeting_26d/<run>/model_<iteration>.pt
+
+uv run --extra cu128 python eval/play_flare_trajectory.py \
+  --task-id Mjlab-Flare-Payload-Targeting \
+  --checkpoint logs/rsl_rl/flare_payload_targeting_26d/<run>/model_<iteration>.pt \
+  --trajectory hexagon --viewer native
+```
+
+For this task, evaluation distance and waypoint counts are measured from the
+payload rather than the quadrotor.
 
 ## Visualize
 
@@ -114,7 +155,7 @@ Trained again for 0.2m arrival distance with gains as: 08-18
     "yaw": 0.01,
     "angular": -0.012,
     "crash": -20.0,
-    "cable_angle_safety": 1,  
+    "cable_angle_safety": 1,
 
 Trained again for 0.2m arrival distance with gains as: 10-08
     "target": 13.0,
@@ -130,6 +171,4 @@ Trained again for 0.2m arrival distance with gains as:10-09
     "yaw": 0.01,
     "angular": -0.015,
     "crash": -20.0,
-    "cable_angle_safety": 1,      
-
-    
+    "cable_angle_safety": 1,

@@ -8,7 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 import torch
-from evaluate_flare import _configure_fixed_trajectory
+from evaluate_flare import PAYLOAD_TARGET_TASK_ID, TASK_ID, _configure_fixed_trajectory
 
 import mjlab.tasks  # noqa: F401
 from mjlab.envs import ManagerBasedRlEnv
@@ -17,7 +17,6 @@ from mjlab.tasks.registry import load_env_cfg, load_rl_cfg, load_runner_cls
 from mjlab.utils.torch import configure_torch_backends
 from mjlab.viewer import NativeMujocoViewer, ViserPlayViewer
 
-TASK_ID = "Mjlab-Flare-Waypoint-Payload"
 DEFAULT_CHECKPOINT = Path(
   "logs/rsl_rl/flare_payload_acp_smooth_v2/2026-09-05_18-55-56/model_1000.pt"
 )
@@ -31,8 +30,8 @@ def play(args: argparse.Namespace) -> None:
   if args.device.startswith("cuda") and not torch.cuda.is_available():
     raise RuntimeError("CUDA is unavailable; pass --device cpu or install CUDA support")
 
-  env_cfg = load_env_cfg(TASK_ID, play=True)
-  agent_cfg = load_rl_cfg(TASK_ID)
+  env_cfg = load_env_cfg(args.task_id, play=True)
+  agent_cfg = load_rl_cfg(args.task_id)
   env_cfg.scene.num_envs = args.num_envs
   env_cfg.seed = args.seed
 
@@ -42,7 +41,7 @@ def play(args: argparse.Namespace) -> None:
   raw_env.reset(seed=args.seed)
 
   env = RslRlVecEnvWrapper(raw_env, clip_actions=agent_cfg.clip_actions)
-  runner_cls = load_runner_cls(TASK_ID) or MjlabOnPolicyRunner
+  runner_cls = load_runner_cls(args.task_id) or MjlabOnPolicyRunner
   runner = runner_cls(env, asdict(agent_cfg), device=args.device)
   runner.load(
     str(checkpoint), load_cfg={"actor": True}, strict=True, map_location=args.device
@@ -71,6 +70,11 @@ def play(args: argparse.Namespace) -> None:
 
 def main() -> None:
   parser = argparse.ArgumentParser(description=__doc__)
+  parser.add_argument(
+    "--task-id",
+    choices=(TASK_ID, PAYLOAD_TARGET_TASK_ID),
+    default=TASK_ID,
+  )
   parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
   parser.add_argument(
     "--trajectory", choices=("hexagon", "straight-3"), default="hexagon"
