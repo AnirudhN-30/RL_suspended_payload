@@ -1,47 +1,140 @@
-# RL_suspended_payload
+![Project banner](https://raw.githubusercontent.com/mujocolab/mjlab/main/docs/source/_static/mjlab-banner.jpg)
 
-Reinforcement learning for a quadrotor carrying a suspended payload, built on
-MJLab (MuJoCo Warp) and RSL-RL PPO. MJLab history and license are preserved;
-the Python package remains `mjlab` for compatibility.
+# mjlab
 
-## Included implementation
+[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/mujocolab/mjlab/ci.yml?branch=main)](https://github.com/mujocolab/mjlab/actions/workflows/ci.yml?query=branch%3Amain)
+[![Documentation](https://github.com/mujocolab/mjlab/actions/workflows/docs.yml/badge.svg)](https://mujocolab.github.io/mjlab/)
+[![License](https://img.shields.io/github/license/mujocolab/mjlab)](https://github.com/mujocolab/mjlab/blob/main/LICENSE)
+[![Nightly Benchmarks](https://img.shields.io/badge/Nightly-Benchmarks-blue)](https://mujocolab.github.io/mjlab/nightly/)
+[![PyPI](https://img.shields.io/pypi/v/mjlab)](https://pypi.org/project/mjlab/)
 
-- FLARE payload plant, body-rate controller, rotor mixer, and waypoint task.
-- 26-value observations and four normalized policy actions.
-- Training reward profiles, verification, and GPU benchmarking.
-- Headless evaluation and interactive hexagon/three-point-line visualization.
+mjlab combines [Isaac Lab](https://github.com/isaac-sim/IsaacLab)'s manager-based API with [MuJoCo Warp](https://github.com/google-deepmind/mujoco_warp), a GPU-accelerated version of [MuJoCo](https://github.com/google-deepmind/mujoco).
+The framework provides composable building blocks for environment design,
+with minimal dependencies and direct access to native MuJoCo data structures.
 
-## Setup and training
+## Getting Started
 
-```bash
-cd RL_suspended_payload
-uv sync --python /usr/bin/python3.10 --extra cu128
-uv run --extra cu128 python scripts/verify_flare_payload.py
-uv run --extra cu128 train Mjlab-Flare-Waypoint-Payload --env.scene.num-envs 1024 --agent.logger tensorboard --agent.resume False --agent.max-iterations 1000
-```
+mjlab requires an NVIDIA GPU for training. macOS is supported for evaluation only.
 
-## Visualization
+**Try it now:**
+
+Run the demo (no installation needed):
 
 ```bash
-uv run --extra cu128 python eval/play_flare_trajectory.py --checkpoint logs/rsl_rl/flare_payload_acp_smooth_v2/2026-09-05_18-55-56/model_1000.pt --trajectory hexagon --trajectory-spacing 1.2 --trajectory-altitude 1.0 --viewer native
+uvx --from mjlab --refresh demo
 ```
 
-Use `--trajectory straight-3` for the line or `--viewer viser` for a web viewer.
-The existing policy uses a 0.5 m arrival radius. Repository migration does not
-change training, controller, or waypoint behavior.
+Or try in [Google Colab](https://colab.research.google.com/github/mujocolab/mjlab/blob/main/notebooks/demo.ipynb) (no local setup required).
 
-Checkpoints, logs, evaluation results, and virtual environments are excluded
-from Git. On the original workstation, ignored links expose old experiment directories and `mjlab/eval/results`
-without duplicating artifacts. New training runs are stored in this repository. Fresh clones
-must install dependencies and supply a checkpoint with `--checkpoint`.
+**Install from source:**
 
-## Documentation and attribution
+```bash
+git clone https://github.com/mujocolab/mjlab.git && cd mjlab
+uv run demo
+```
 
-- [FLARE task and training](src/mjlab/tasks/flare_payload/README.md)
-- [Evaluation and visualization](eval/README.md)
-- [Original MJLab README](README.mjlab.md)
-- [Upstream source](https://github.com/lfrecalde1/mjlab)
-- [License](LICENSE)
+For alternative installation methods (PyPI, Docker), see the [Installation Guide](https://mujocolab.github.io/mjlab/main/source/installation.html).
 
-The default training task now uses drone-relative XYZ waypoint sampling and the
-unsquared L2 smoothness reward. See the task documentation for paper distinctions.
+## Training Examples
+
+### 1. Velocity Tracking
+
+Train a Unitree G1 humanoid to follow velocity commands on flat terrain:
+
+```bash
+uv run train Mjlab-Velocity-Flat-Unitree-G1 --env.scene.num-envs 4096
+```
+
+**Multi-GPU Training:** Scale to multiple GPUs using `--gpu-ids`:
+
+```bash
+uv run train Mjlab-Velocity-Flat-Unitree-G1 \
+  --gpu-ids "[0, 1]" \
+  --env.scene.num-envs 4096
+```
+
+See the [Distributed Training guide](https://mujocolab.github.io/mjlab/main/source/training/distributed_training.html) for details.
+
+Evaluate a policy while training (fetches latest checkpoint from Weights & Biases):
+
+```bash
+uv run play Mjlab-Velocity-Flat-Unitree-G1 --wandb-run-path your-org/mjlab/run-id
+```
+
+### 2. Motion Imitation
+
+Train a humanoid to mimic reference motions. See the [motion imitation guide](https://mujocolab.github.io/mjlab/main/source/training/motion_imitation.html) for preprocessing setup.
+
+```bash
+uv run train Mjlab-Tracking-Flat-Unitree-G1 --registry-name your-org/motions/motion-name --env.scene.num-envs 4096
+uv run play Mjlab-Tracking-Flat-Unitree-G1 --wandb-run-path your-org/mjlab/run-id
+```
+
+### 3. Sanity-check with Dummy Agents
+
+Use built-in agents to sanity check your MDP before training:
+
+```bash
+uv run play Mjlab-Your-Task-Id --agent zero  # Sends zero actions
+uv run play Mjlab-Your-Task-Id --agent random  # Sends uniform random actions
+```
+
+When running motion-tracking tasks, add `--registry-name your-org/motions/motion-name` to the command.
+
+
+## Documentation
+
+Full documentation is available at **[mujocolab.github.io/mjlab](https://mujocolab.github.io/mjlab/)**.
+
+## Development
+
+```bash
+make test          # Run all tests
+make test-fast     # Skip slow tests
+make format        # Format and lint
+make docs          # Build docs locally
+```
+
+For development setup: `uvx pre-commit install`
+
+## Citation
+
+mjlab is used in published research and open-source robotics projects. See the [Research](https://mujocolab.github.io/mjlab/main/source/research.html) page for publications and projects, or share your own in [Show and Tell](https://github.com/mujocolab/mjlab/discussions/categories/show-and-tell).
+
+If you use mjlab in your research, please consider citing:
+
+```bibtex
+@misc{zakka2026mjlablightweightframeworkgpuaccelerated,
+  title={mjlab: A Lightweight Framework for GPU-Accelerated Robot Learning},
+  author={Kevin Zakka and Qiayuan Liao and Brent Yi and Louis Le Lay and Koushil Sreenath and Pieter Abbeel},
+  year={2026},
+  eprint={2601.22074},
+  archivePrefix={arXiv},
+  primaryClass={cs.RO},
+  url={https://arxiv.org/abs/2601.22074},
+}
+```
+
+## License
+
+mjlab is licensed under the [Apache License, Version 2.0](LICENSE).
+
+### Third-Party Code
+
+Some portions of mjlab are forked from external projects:
+
+- **`src/mjlab/utils/lab_api/`** — Utilities forked from [NVIDIA Isaac
+  Lab](https://github.com/isaac-sim/IsaacLab) (BSD-3-Clause license, see file
+  headers)
+
+Forked components retain their original licenses. See file headers for details.
+
+## Acknowledgments
+
+mjlab wouldn't exist without the excellent work of the Isaac Lab team, whose API
+design and abstractions mjlab builds upon.
+
+Thanks to the MuJoCo Warp team — especially Erik Frey and Taylor Howell — for
+answering our questions, giving helpful feedback, and implementing features
+based on our requests countless times.
+# mjlab

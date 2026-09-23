@@ -22,7 +22,3 @@ src/mjlab/tasks/flare_payload/FLARE.pdf
 # Documentation outputs.
 **/_build/*
 **/generated/*
-
-# Local artifact links (also ignore symlinks).
-/logs
-/eval/results

@@ -136,10 +136,10 @@ class FlareRotorRateAction(BaseAction):
 @dataclass(kw_only=True)
 class FlareWaypointCommandCfg(CommandTermCfg):
   entity_name: str = "quadrotor"
-  x_range: tuple[float, float] = (-2.0, 2.0)
-  y_range: tuple[float, float] = (-2.0, 2.0)
+  x_range: tuple[float, float] = (-1.5, 1.5)
+  y_range: tuple[float, float] = (-1.5, 1.5)
   z_range: tuple[float, float] = (0.5, 1.5)
-  arrival_threshold: float = 0.5
+  arrival_threshold: float = 0.2
 
   def build(self, env):
     return FlareWaypointCommand(self, env)
@@ -163,19 +163,16 @@ class FlareWaypointCommand(CommandTerm):
   def command(self) -> torch.Tensor:
     return self.current
 
-  def _sample(self, env_ids: torch.Tensor, anchor: torch.Tensor) -> torch.Tensor:
-    """Sample paper Section II-C XYZ offsets relative to the drone."""
+  def _sample(self, env_ids: torch.Tensor) -> torch.Tensor:
     values = torch.empty(len(env_ids), 3, device=self.device)
     values[:, 0].uniform_(*self.cfg.x_range)
     values[:, 1].uniform_(*self.cfg.y_range)
     values[:, 2].uniform_(*self.cfg.z_range)
-    return values + anchor
+    return values + self._env.scene.env_origins[env_ids]
 
   def _resample_command(self, env_ids: torch.Tensor) -> None:
-    self.current[env_ids] = self._sample(
-      env_ids, self.asset.data.root_link_pos_w[env_ids]
-    )
-    self.next[env_ids] = self._sample(env_ids, self.asset.data.root_link_pos_w[env_ids])
+    self.current[env_ids] = self._sample(env_ids)
+    self.next[env_ids] = self._sample(env_ids)
     self.observation_current[env_ids] = self.current[env_ids]
     self.observation_next[env_ids] = self.next[env_ids]
 
@@ -191,9 +188,7 @@ class FlareWaypointCommand(CommandTerm):
     env_ids = reached.nonzero(as_tuple=False).flatten()
     if len(env_ids):
       self.current[env_ids] = self.next[env_ids]
-      self.next[env_ids] = self._sample(
-        env_ids, self.asset.data.root_link_pos_w[env_ids]
-      )
+      self.next[env_ids] = self._sample(env_ids)
 
   def _debug_vis_impl(self, visualizer: DebugVisualizer) -> None:
     for env_idx in visualizer.get_env_indices(self.num_envs):
@@ -310,9 +305,8 @@ class TargetProgressReward(ManagerTermBase):
 
 
 def action_smoothness(env) -> torch.Tensor:
-  """FLARE Eq. (8): unsquared L2 action delta; coefficient is in reward config."""
-  return torch.linalg.vector_norm(
-    env.action_manager.action - env.action_manager.prev_action, dim=1
+  return torch.sum(
+    (env.action_manager.action - env.action_manager.prev_action).square(), dim=1
   )
 
 

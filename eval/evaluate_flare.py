@@ -66,8 +66,7 @@ def _configure_fixed_trajectory(waypoint_term, raw_env, args) -> list[list[float
     return []
   cursor = torch.zeros(raw_env.num_envs, dtype=torch.long, device=raw_env.device)
 
-  def sample_fixed(env_ids: torch.Tensor, anchor: torch.Tensor) -> torch.Tensor:
-    del anchor  # Fixed tracks already contain absolute local-frame positions.
+  def sample_fixed(env_ids: torch.Tensor) -> torch.Tensor:
     indices = cursor[env_ids] % len(points)
     values = points[indices] + raw_env.scene.env_origins[env_ids]
     cursor[env_ids] += 1

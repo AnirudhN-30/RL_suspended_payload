@@ -47,12 +47,24 @@ _REWARD_WEIGHTS = {
     "cable_angle_safety": 0.3,
   },
   "acp_smooth": {
-    "target": 5.0,
-    "smooth": -0.01,
+    # "target": 5.0,
+    # "smooth": -0.01,
+    # "yaw": 0.01,
+    # "angular": -0.005,
+    # "crash": -20.0,
+    # "cable_angle_safety": 1.0,
+    # "target": 10.0,
+    # "smooth": -0.05,
+    # "yaw": 0.01,
+    # "angular": -0.01,
+    # "crash": -20.0,
+    # "cable_angle_safety": 1,
+    "target": 13.0,
+    "smooth": -0.08,
     "yaw": 0.01,
-    "angular": -0.005,
+    "angular": -0.02,
     "crash": -20.0,
-    "cable_angle_safety": 1.0,
+    "cable_angle_safety": 1.1,  
   },
 }
 
@@ -205,11 +217,10 @@ def flare_payload_env_cfg(
 
 
 def flare_payload_ppo_runner_cfg(
-  profile: PpoProfile = "flare",
+  profile: PpoProfile = "acp_smooth",
 ) -> RslRlOnPolicyRunnerCfg:
   return RslRlOnPolicyRunnerCfg(
     actor=RslRlModelCfg(
-      class_name="mjlab.tasks.flare_payload.policy:FlareTanhActor",
       hidden_dims=(128, 128),
       activation="tanh",
       obs_normalization=False,
@@ -239,11 +250,11 @@ def flare_payload_ppo_runner_cfg(
       max_grad_norm=1.0,
     ),
     experiment_name={
-      "flare": "flare_payload_drone_relative_l2_tanh_v2",
+      "flare": "flare_payload_baseline",
       "acp_tuned": "flare_payload_acp_tuned",
       "acp_smooth": "flare_payload_acp_smooth_v2",
     }[profile],
     save_interval=100,
     num_steps_per_env=100,
-    max_iterations=1000,
+    max_iterations=800,
   )
