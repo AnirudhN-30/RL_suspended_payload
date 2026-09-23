@@ -224,6 +224,7 @@ def flare_payload_targeting_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     entity_name="payload",
     sampling_entity_name="quadrotor",
     sample_relative_to_entity=True,
+    relative_sampling_axes=(True, True, False),
     x_range=(-2.0, 2.0),
     y_range=(-2.0, 2.0),
     z_range=(0.5, 1.5),

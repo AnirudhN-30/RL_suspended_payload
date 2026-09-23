@@ -47,7 +47,8 @@ retains the existing 26-value observation, four CTBR actions, rate PID, motor
 mixer, and ACP-smooth body-rate penalty. The active waypoint is considered
 reached when the **payload** enters a 0.2 m sphere, and target progress is
 computed from the payload position. Current and next targets are sampled from
-the paper's `[-2, 2] x [-2, 2] x [0.5, 1.5] m` volume relative to the quadrotor.
+the paper's target volume: `x/y` are sampled in `[-2, 2] m` relative to the
+quadrotor, while `z` is sampled as an absolute altitude in `[0.5, 1.5] m`.
 Action smoothness uses the paper's L2 norm of consecutive action differences.
 The separate task keeps existing Scenario-I checkpoints compatible.
 

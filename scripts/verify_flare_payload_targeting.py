@@ -22,10 +22,11 @@ def main() -> None:
   quad_position = env.scene["quadrotor"].data.root_link_pos_w
   payload_position = env.scene["payload"].data.root_link_pos_w
   sampled_offset = waypoint.current - quad_position
+  sampled_altitude = waypoint.current[:, 2] - env.scene.env_origins[:, 2]
   assert torch.all(sampled_offset[:, 0].abs() <= 2.0 + 1.0e-5)
   assert torch.all(sampled_offset[:, 1].abs() <= 2.0 + 1.0e-5)
-  assert torch.all((sampled_offset[:, 2] >= 0.5 - 1.0e-5))
-  assert torch.all((sampled_offset[:, 2] <= 1.5 + 1.0e-5))
+  assert torch.all(sampled_altitude >= 0.5 - 1.0e-5)
+  assert torch.all(sampled_altitude <= 1.5 + 1.0e-5)
 
   # Arrival must follow the payload rather than the quadrotor.
   original_target = waypoint.current.clone()
@@ -51,6 +52,7 @@ def main() -> None:
   print(f"observations: {tuple(observations['actor'].shape)}")
   print(f"actions: {env.action_manager.total_action_dim}")
   print(f"tracking entity: {waypoint.cfg.entity_name}")
+  print("target sampling: quadrotor-relative XY, environment-absolute Z")
   print(f"arrival radius: {waypoint.cfg.arrival_threshold:.3f} m")
   print(f"terminated/timeouts: {terminated.sum().item()}/{truncated.sum().item()}")
   print("MJLab FLARE payload-targeting CUDA verification: PASS")

@@ -138,6 +138,7 @@ class FlareWaypointCommandCfg(CommandTermCfg):
   entity_name: str = "quadrotor"
   sampling_entity_name: str | None = None
   sample_relative_to_entity: bool = False
+  relative_sampling_axes: tuple[bool, bool, bool] = (True, True, True)
   x_range: tuple[float, float] = (-1.5, 1.5)
   y_range: tuple[float, float] = (-1.5, 1.5)
   z_range: tuple[float, float] = (0.5, 1.5)
@@ -182,7 +183,11 @@ class FlareWaypointCommand(CommandTerm):
       entity_data = self.sampling_asset.data
       free_pos_ids = entity_data.indexing.free_joint_q_adr[:3]
       anchor = entity_data.data.qpos[env_ids][:, free_pos_ids]
-      return values + anchor
+      base = self._env.scene.env_origins[env_ids].clone()
+      for axis, relative in enumerate(self.cfg.relative_sampling_axes):
+        if relative:
+          base[:, axis] = anchor[:, axis]
+      return values + base
     return values + self._env.scene.env_origins[env_ids]
 
   def _resample_command(self, env_ids: torch.Tensor) -> None:
