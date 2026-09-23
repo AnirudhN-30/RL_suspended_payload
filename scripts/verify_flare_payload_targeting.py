@@ -28,6 +28,16 @@ def main() -> None:
   assert torch.all(sampled_altitude >= 0.5 - 1.0e-5)
   assert torch.all(sampled_altitude <= 1.5 + 1.0e-5)
 
+  expected_quad_error = ((waypoint.current - quad_position) * torch.tensor(
+    (1.0 / 3.0, 1.0 / 3.0, 1.0), device=env.device
+  )).clamp(-1.0, 1.0)
+  expected_payload_error = ((waypoint.current - payload_position) * torch.tensor(
+    (1.0 / 3.0, 1.0 / 3.0, 1.0), device=env.device
+  )).clamp(-1.0, 1.0)
+  assert torch.allclose(observations["actor"][:, 0:3], expected_quad_error)
+  assert torch.allclose(observations["actor"][:, 3:6], expected_payload_error)
+  assert not torch.allclose(expected_quad_error, expected_payload_error)
+
   # Arrival must follow the payload rather than the quadrotor.
   original_target = waypoint.current.clone()
   waypoint.current[:] = payload_position

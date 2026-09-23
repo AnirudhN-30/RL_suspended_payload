@@ -18,7 +18,7 @@ from mjlab.viewer import NativeMujocoViewer
 from mjlab.viewer.base import VerbosityLevel
 
 TASK_ID = "Mjlab-Flare-Payload-Targeting"
-LOG_ROOT = Path("logs/rsl_rl/flare_payload_targeting_26d")
+LOG_ROOT = Path("logs/rsl_rl/flare_payload_targeting_26d_v2")
 
 
 def _latest_checkpoint() -> Path:

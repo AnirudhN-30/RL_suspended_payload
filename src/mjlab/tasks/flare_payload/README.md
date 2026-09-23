@@ -42,8 +42,8 @@ FLARE coefficients through `Mjlab-Flare-Waypoint-Payload-Flare-Rewards`.
 
 ## Payload waypoint navigation
 
-`Mjlab-Flare-Payload-Targeting` is the payload-navigation variant. It deliberately
-retains the existing 26-value observation, four CTBR actions, rate PID, motor
+`Mjlab-Flare-Payload-Targeting` is the payload-navigation variant. It retains a
+26-value observation, four CTBR actions, rate PID, motor
 mixer, and ACP-smooth body-rate penalty. The active waypoint is considered
 reached when the **payload** enters a 0.2 m sphere, and target progress is
 computed from the payload position. Current and next targets are sampled from
@@ -51,6 +51,13 @@ the paper's target volume: `x/y` are sampled in `[-2, 2] m` relative to the
 quadrotor, while `z` is sampled as an absolute altitude in `[0.5, 1.5] m`.
 Action smoothness uses the paper's L2 norm of consecutive action differences.
 The separate task keeps existing Scenario-I checkpoints compatible.
+
+The payload observation contains the current target relative to both the
+quadrotor (3) and payload (3), quadrotor velocity (3), rotation matrix (9),
+previous action (4), and cable angles/rates (4). The direct payload-target error
+replaces Scenario I's next-waypoint preview while preserving the 26D network
+input. Checkpoints from the earlier two-waypoint payload experiment are not
+compatible with this corrected observation semantics.
 
 ## Setup and checks
 
@@ -94,7 +101,7 @@ uv run --extra cu128 train Mjlab-Flare-Payload-Targeting \
 ```
 
 Its checkpoints are written below
-`logs/rsl_rl/flare_payload_targeting_26d/`. The actor uses a final tanh
+`logs/rsl_rl/flare_payload_targeting_26d_v2/`. The actor uses a final tanh
 projection, while Gaussian exploration and the downstream action clipping stay
 unchanged.
 

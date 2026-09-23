@@ -240,6 +240,14 @@ def next_waypoint_rel(env, asset_cfg: SceneEntityCfg = QUAD_CFG) -> torch.Tensor
   return (relative * scale).clamp(-1.0, 1.0)
 
 
+def payload_target_rel(env, asset_cfg: SceneEntityCfg = PAYLOAD_CFG) -> torch.Tensor:
+  """Current target relative to the payload for payload-targeting policies."""
+  asset = _payload(env, asset_cfg)
+  relative = _waypoints(env).observation_current - asset.data.root_link_pos_w
+  scale = torch.tensor((1.0 / 3.0, 1.0 / 3.0, 1.0), device=env.device)
+  return (relative * scale).clamp(-1.0, 1.0)
+
+
 def linear_velocity_world(env, asset_cfg: SceneEntityCfg = QUAD_CFG) -> torch.Tensor:
   velocity = _quad(env, asset_cfg).data.root_link_lin_vel_w
   scale = torch.tensor((0.1, 0.1, 0.3), device=env.device)
