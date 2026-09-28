@@ -240,17 +240,36 @@ def next_waypoint_rel(env, asset_cfg: SceneEntityCfg = QUAD_CFG) -> torch.Tensor
   return (relative * scale).clamp(-1.0, 1.0)
 
 
+def scenario2_quad_target_rel(
+  env, asset_cfg: SceneEntityCfg = QUAD_CFG
+) -> torch.Tensor:
+  """FLARE Scenario-II target relative to the quadrotor."""
+  asset = _quad(env, asset_cfg)
+  relative = _waypoints(env).observation_current - asset.data.root_link_pos_w
+  scale = torch.tensor((1.0 / 5.0, 1.0 / 5.0, 1.0), device=env.device)
+  return (relative * scale).clamp(-1.0, 1.0)
+
+
 def payload_target_rel(env, asset_cfg: SceneEntityCfg = PAYLOAD_CFG) -> torch.Tensor:
-  """Current target relative to the payload for payload-targeting policies."""
+  """FLARE Scenario-II target relative to the payload."""
   asset = _payload(env, asset_cfg)
   relative = _waypoints(env).observation_current - asset.data.root_link_pos_w
-  scale = torch.tensor((1.0 / 3.0, 1.0 / 3.0, 1.0), device=env.device)
+  scale = torch.tensor((1.0 / 5.0, 1.0 / 5.0, 1.0), device=env.device)
   return (relative * scale).clamp(-1.0, 1.0)
 
 
 def linear_velocity_world(env, asset_cfg: SceneEntityCfg = QUAD_CFG) -> torch.Tensor:
   velocity = _quad(env, asset_cfg).data.root_link_lin_vel_w
   scale = torch.tensor((0.1, 0.1, 0.3), device=env.device)
+  return (velocity * scale).clamp(-1.0, 1.0)
+
+
+def scenario2_linear_velocity_world(
+  env, asset_cfg: SceneEntityCfg = QUAD_CFG
+) -> torch.Tensor:
+  """FLARE Scenario-II quadrotor velocity scaling."""
+  velocity = _quad(env, asset_cfg).data.root_link_lin_vel_w
+  scale = torch.tensor((0.1, 0.1, 1.0 / 3.0), device=env.device)
   return (velocity * scale).clamp(-1.0, 1.0)
 
 
@@ -301,6 +320,28 @@ class CableAngleObservation(ManagerTermBase):
   def reset(self, env_ids) -> None:
     self.previous[env_ids] = 0.0
     self.initialized[env_ids] = False
+
+
+class Scenario2CableAngleObservation(CableAngleObservation):
+  """FLARE body-frame cable angles extended with finite-difference rates."""
+
+  def _angles(self) -> torch.Tensor:
+    vector_w = (
+      _payload(self._env).data.root_link_pos_w
+      - _quad(self._env).data.root_link_pos_w
+    )
+    rotation_wb = matrix_from_quat(_quad(self._env).data.root_link_quat_w)
+    vector_b = torch.bmm(
+      rotation_wb.transpose(1, 2), vector_w.unsqueeze(-1)
+    ).squeeze(-1)
+    # Paper Eq. (3): phi is the Y-Z deviation and theta the X-Z deviation.
+    return torch.stack(
+      (
+        torch.atan2(vector_b[:, 1], -vector_b[:, 2]),
+        torch.atan2(vector_b[:, 0], -vector_b[:, 2]),
+      ),
+      dim=1,
+    )
 
 
 def cable_body_angle(env) -> torch.Tensor:

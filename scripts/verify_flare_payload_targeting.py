@@ -20,14 +20,30 @@ def main() -> None:
   assert observations["actor"].shape == (16, 26)
   assert observations["critic"].shape == (16, 26)
   assert env.action_manager.total_action_dim == 4
-  assert list(cfg.observations["actor"].terms) == list(
-    baseline_cfg.observations["actor"].terms
+  assert list(cfg.observations["actor"].terms) == [
+    "quad_target",
+    "payload_target",
+    "linear_velocity",
+    "rotation_matrix",
+    "previous_action",
+    "cable_state",
+  ]
+  assert (
+    cfg.observations["actor"].terms["quad_target"].func
+    is mdp.scenario2_quad_target_rel
   )
-  for name in cfg.observations["actor"].terms:
-    assert (
-      cfg.observations["actor"].terms[name].func
-      is baseline_cfg.observations["actor"].terms[name].func
-    )
+  assert (
+    cfg.observations["actor"].terms["payload_target"].func
+    is mdp.payload_target_rel
+  )
+  assert (
+    cfg.observations["actor"].terms["linear_velocity"].func
+    is mdp.scenario2_linear_velocity_world
+  )
+  assert (
+    cfg.observations["actor"].terms["cable_state"].func
+    is mdp.Scenario2CableAngleObservation
+  )
   assert agent_cfg.actor == baseline_agent_cfg.actor
   assert agent_cfg.critic == baseline_agent_cfg.critic
   assert agent_cfg.algorithm == baseline_agent_cfg.algorithm
@@ -50,14 +66,19 @@ def main() -> None:
   assert torch.all(sampled_altitude >= 0.5 - 1.0e-5)
   assert torch.all(sampled_altitude <= 1.5 + 1.0e-5)
 
-  expected_current_error = ((waypoint.current - quad_position) * torch.tensor(
-    (1.0 / 3.0, 1.0 / 3.0, 1.0), device=env.device
+  expected_quad_error = ((waypoint.current - quad_position) * torch.tensor(
+    (1.0 / 5.0, 1.0 / 5.0, 1.0), device=env.device
   )).clamp(-1.0, 1.0)
-  expected_next_error = ((waypoint.next - quad_position) * torch.tensor(
-    (1.0 / 3.0, 1.0 / 3.0, 1.0), device=env.device
+  expected_payload_error = ((waypoint.current - payload_position) * torch.tensor(
+    (1.0 / 5.0, 1.0 / 5.0, 1.0), device=env.device
   )).clamp(-1.0, 1.0)
-  assert torch.allclose(observations["actor"][:, 0:3], expected_current_error)
-  assert torch.allclose(observations["actor"][:, 3:6], expected_next_error)
+  expected_velocity = (env.scene["quadrotor"].data.root_link_lin_vel_w * torch.tensor(
+    (0.1, 0.1, 1.0 / 3.0), device=env.device
+  )).clamp(-1.0, 1.0)
+  assert torch.allclose(observations["actor"][:, 0:3], expected_quad_error)
+  assert torch.allclose(observations["actor"][:, 3:6], expected_payload_error)
+  assert torch.allclose(observations["actor"][:, 6:9], expected_velocity)
+  assert not torch.allclose(expected_quad_error, expected_payload_error)
 
   # Arrival must follow the payload rather than the quadrotor.
   original_target = waypoint.current.clone()
@@ -92,8 +113,8 @@ def main() -> None:
   print(f"observations: {tuple(observations['actor'].shape)}")
   print(f"actions: {env.action_manager.total_action_dim}")
   print(f"tracking entity: {waypoint.cfg.entity_name}")
-  print("target sampling/scaling: identical to MJLab Scenario-I baseline")
-  print("network/PPO/reward weights: identical to MJLab Scenario-I baseline")
+  print("observation: FLARE Scenario II plus cable-angle rates (26D)")
+  print("network/PPO/reward calculation and weights: MJLab baseline")
   print(f"arrival radius: {waypoint.cfg.arrival_threshold:.3f} m")
   print(f"terminated/timeouts: {terminated.sum().item()}/{truncated.sum().item()}")
   print("MJLab FLARE payload-targeting CUDA verification: PASS")

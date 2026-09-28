@@ -217,12 +217,28 @@ def flare_payload_env_cfg(
 
 
 def flare_payload_targeting_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
-  """Payload targeting with the working MJLab waypoint task kept unchanged."""
+  """Payload targeting with FLARE Scenario-II observations extended to 26D."""
   cfg = flare_payload_env_cfg(play=play, reward_profile="acp_smooth")
 
-  # Preserve Scenario-I's current/next target observations, normalization,
-  # reward weights, smoothness calculation, network, and PPO settings. Only
-  # the entity used for waypoint arrival and progress changes to the payload.
+  # Scenario II uses one target expressed relative to both the quadrotor and
+  # payload. Retain cable-angle rates from the working MJLab task, producing
+  # 26 inputs instead of the paper's 24. All non-observation settings remain
+  # identical to the working ACP-smooth baseline.
+  actor_terms = {
+    "quad_target": ObservationTermCfg(func=mdp.scenario2_quad_target_rel),
+    "payload_target": ObservationTermCfg(func=mdp.payload_target_rel),
+    "linear_velocity": ObservationTermCfg(
+      func=mdp.scenario2_linear_velocity_world
+    ),
+    "rotation_matrix": ObservationTermCfg(func=mdp.rotation_matrix_flat),
+    "previous_action": ObservationTermCfg(func=mdp.previous_action),
+    "cable_state": ObservationTermCfg(func=mdp.Scenario2CableAngleObservation),
+  }
+  cfg.observations = {
+    "actor": ObservationGroupCfg(actor_terms, nan_policy="error"),
+    "critic": ObservationGroupCfg({**actor_terms}, nan_policy="error"),
+  }
+
   cfg.commands["waypoints"] = mdp.FlareWaypointCommandCfg(
     entity_name="payload",
     arrival_threshold=0.2,
@@ -285,5 +301,5 @@ def flare_payload_ppo_runner_cfg(
 
 def flare_payload_targeting_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
   cfg = flare_payload_ppo_runner_cfg(profile="acp_smooth")
-  cfg.experiment_name = "flare_payload_targeting_mjlab_aligned"
+  cfg.experiment_name = "flare_payload_targeting_scenario2_26d"
   return cfg
