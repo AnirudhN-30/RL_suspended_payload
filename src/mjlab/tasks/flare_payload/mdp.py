@@ -350,7 +350,14 @@ class PayloadTargetProgressReward(ManagerTermBase):
     return reward
 
   def reset(self, env_ids) -> None:
-    self.previous_position[env_ids] = _payload(self._env).data.root_link_pos_w[env_ids]
+    # Reset events have already written qpos, but MuJoCo has not called
+    # forward() yet, so derived root_link_pos_w still belongs to the previous
+    # episode. Read the payload free-joint position directly from qpos.
+    payload_data = _payload(self._env).data
+    free_pos_ids = payload_data.indexing.free_joint_q_adr[:3]
+    self.previous_position[env_ids] = payload_data.data.qpos[env_ids][
+      :, free_pos_ids
+    ]
 
 
 def action_smoothness(env) -> torch.Tensor:

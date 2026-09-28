@@ -217,32 +217,14 @@ def flare_payload_env_cfg(
 
 
 def flare_payload_targeting_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
-  """FLARE payload-waypoint navigation while retaining the released 26D interface."""
+  """Payload targeting with the working MJLab waypoint task kept unchanged."""
   cfg = flare_payload_env_cfg(play=play, reward_profile="acp_smooth")
 
-  # Keep 26 inputs, but replace Scenario-I's next-waypoint preview with the
-  # payload-to-target error required to make payload targeting observable.
-  actor_terms = {
-    "quad_target": ObservationTermCfg(func=mdp.current_waypoint_rel),
-    "payload_target": ObservationTermCfg(func=mdp.payload_target_rel),
-    "linear_velocity": ObservationTermCfg(func=mdp.linear_velocity_world),
-    "rotation_matrix": ObservationTermCfg(func=mdp.rotation_matrix_flat),
-    "previous_action": ObservationTermCfg(func=mdp.previous_action),
-    "cable_state": ObservationTermCfg(func=mdp.CableAngleObservation),
-  }
-  cfg.observations = {
-    "actor": ObservationGroupCfg(actor_terms, nan_policy="error"),
-    "critic": ObservationGroupCfg({**actor_terms}, nan_policy="error"),
-  }
-
+  # Preserve Scenario-I's current/next target observations, normalization,
+  # reward weights, smoothness calculation, network, and PPO settings. Only
+  # the entity used for waypoint arrival and progress changes to the payload.
   cfg.commands["waypoints"] = mdp.FlareWaypointCommandCfg(
     entity_name="payload",
-    sampling_entity_name="quadrotor",
-    sample_relative_to_entity=True,
-    relative_sampling_axes=(True, True, False),
-    x_range=(-2.0, 2.0),
-    y_range=(-2.0, 2.0),
-    z_range=(0.5, 1.5),
     arrival_threshold=0.2,
     resampling_time_range=(1.0e9, 1.0e9),
     debug_vis=True,
@@ -250,15 +232,6 @@ def flare_payload_targeting_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.rewards["target"] = RewardTermCfg(
     func=mdp.PayloadTargetProgressReward,
     weight=_REWARD_WEIGHTS["acp_smooth"]["target"],
-  )
-  cfg.rewards["smooth"] = RewardTermCfg(
-    func=mdp.action_smoothness_l2,
-    weight=_REWARD_WEIGHTS["acp_smooth"]["smooth"],
-  )
-  # Keep the existing ACP-smooth body-rate penalty as requested.
-  cfg.rewards["angular"] = RewardTermCfg(
-    func=mdp.angular_rate_norm,
-    weight=_REWARD_WEIGHTS["acp_smooth"]["angular"],
   )
   cfg.terminations["crash"] = TerminationTermCfg(
     func=mdp.FlarePayloadTargetCrashTermination
@@ -312,7 +285,5 @@ def flare_payload_ppo_runner_cfg(
 
 def flare_payload_targeting_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
   cfg = flare_payload_ppo_runner_cfg(profile="acp_smooth")
-  cfg.actor.class_name = "mjlab.tasks.flare_payload.policy:FlarePayloadActorV2"
-  cfg.experiment_name = "flare_payload_targeting_26d_v2"
-  cfg.max_iterations = 1000
+  cfg.experiment_name = "flare_payload_targeting_mjlab_aligned"
   return cfg

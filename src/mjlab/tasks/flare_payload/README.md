@@ -43,21 +43,19 @@ FLARE coefficients through `Mjlab-Flare-Waypoint-Payload-Flare-Rewards`.
 ## Payload waypoint navigation
 
 `Mjlab-Flare-Payload-Targeting` is the payload-navigation variant. It retains a
-26-value observation, four CTBR actions, rate PID, motor
-mixer, and ACP-smooth body-rate penalty. The active waypoint is considered
-reached when the **payload** enters a 0.2 m sphere, and target progress is
-computed from the payload position. Current and next targets are sampled from
-the paper's target volume: `x/y` are sampled in `[-2, 2] m` relative to the
-quadrotor, while `z` is sampled as an absolute altitude in `[0.5, 1.5] m`.
-Action smoothness uses the paper's L2 norm of consecutive action differences.
-The separate task keeps existing Scenario-I checkpoints compatible.
+working Scenario-I task unchanged: the same 26 observations and their scaling,
+four CTBR actions, `128 x 128` MLP actor/critic, PPO settings, ACP-smooth reward
+weights, squared action-change reward, rate PID, and rotor mixer. The observation
+still contains the current and next target relative to the **quadrotor**,
+quadrotor velocity, rotation matrix, previous action, and cable angles/rates.
 
-The payload observation contains the current target relative to both the
-quadrotor (3) and payload (3), quadrotor velocity (3), rotation matrix (9),
-previous action (4), and cable angles/rates (4). The direct payload-target error
-replaces Scenario I's next-waypoint preview while preserving the 26D network
-input. Checkpoints from the earlier two-waypoint payload experiment are not
-compatible with this corrected observation semantics.
+Only the task objective changes. The active waypoint is considered reached when
+the **payload** enters a 0.2 m sphere, and the FLARE progress equation uses the
+payload position instead of the quadrotor position. Waypoints use the same world
+coordinate distribution as the working MJLab baseline: `x/y` in `[-1.5, 1.5] m`
+and absolute `z` in `[0.5, 1.5] m`. A separate log directory prevents older
+payload experiments with different observation semantics or actor outputs from
+being loaded accidentally.
 
 ## Setup and checks
 
@@ -101,20 +99,20 @@ uv run --extra cu128 train Mjlab-Flare-Payload-Targeting \
 ```
 
 Its checkpoints are written below
-`logs/rsl_rl/flare_payload_targeting_26d_v2/`. The actor uses a final tanh
-projection, while Gaussian exploration and the downstream action clipping stay
-unchanged.
+`logs/rsl_rl/flare_payload_targeting_mjlab_aligned/`. The network and action
+handling are identical to `Mjlab-Flare-Waypoint-Payload`; training starts from
+scratch.
 
 Evaluate or visualize a trained payload-targeting checkpoint with:
 
 ```bash
 uv run --extra cu128 python eval/evaluate_flare.py \
   --task-id Mjlab-Flare-Payload-Targeting \
-  --checkpoint logs/rsl_rl/flare_payload_targeting_26d/<run>/model_<iteration>.pt
+  --checkpoint logs/rsl_rl/flare_payload_targeting_mjlab_aligned/<run>/model_<iteration>.pt
 
 uv run --extra cu128 python eval/play_flare_trajectory.py \
   --task-id Mjlab-Flare-Payload-Targeting \
-  --checkpoint logs/rsl_rl/flare_payload_targeting_26d/<run>/model_<iteration>.pt \
+  --checkpoint logs/rsl_rl/flare_payload_targeting_mjlab_aligned/<run>/model_<iteration>.pt \
   --trajectory hexagon --viewer native
 ```
 
@@ -128,7 +126,7 @@ quadrotor or payload with the native MuJoCo viewer:
 
 ```bash
 uv run --extra cu128 python eval/play_flare_hover.py \
-  --checkpoint logs/rsl_rl/flare_payload_targeting_26d/<run>/model_<iteration>.pt
+  --checkpoint logs/rsl_rl/flare_payload_targeting_mjlab_aligned/<run>/model_<iteration>.pt
 ```
 
 If `--checkpoint` is omitted, the script selects the most recently written
